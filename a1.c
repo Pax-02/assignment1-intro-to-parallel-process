@@ -65,7 +65,59 @@ int main(int argc, char **argv) {
         }
     }
 
-    
+    double serial_multiplication, serial_multiplication_end, start_s,end_s = 0.0;
+
+    //start with mode 0 (serial)
+    if (mode ==0){
+        //start serial time
+        start_s = omp_get_wtime();
+        //implement the multiplication and adding it to c
+        serial_multiplication= omp_get_wtime();
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double sum = 0.0;
+                for (size_t k = 0; k < N; k++) {
+                    sum += A[idx(i,k,N)] * B[idx(k,j,N)];
+                }
+                C[idx(i,j,N)] = sum;
+            }
+        }
+        serial_multiplication_end = omp_get_wtime();
+
+        double final_m= serial_multiplication_end - serial_multiplication;
+        
+        //calcylate the sum, max and the checksum formula
+        double sumC = 0.0;
+        double maxC = -INFINITY;
+        long long checksum = 0;
+        double serial_sum_max_check, serial_sum_max_check_end = 0.0;
+        serial_sum_max_check = omp_get_wtime();
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double v = C[idx(i,j,N)];
+                sumC += v;
+                if (v > maxC) maxC = v;
+
+                // cast it from float to integers
+                long long term = ((long long)(v * 1000.0)) % 100000;
+                checksum += term;
+            }
+        }
+
+        serial_sum_max_check_end = omp_get_wtime();
+        end_s = omp_get_wtime();
+        //time to run the multiplocation,sum andb checksum
+        double final_sum_max= serial_sum_max_check_end-serial_sum_max_check;
+        //whole time to run serial
+        double final_s=end_s - start_s ;
+
+        printf("N=%zu mode=%d omp_max_threads=%d\n", N, mode, omp_get_max_threads());
+        printf("Matrix Multiplication and C serial time =%.6f\n", final_m);
+        printf("SUM, Max, checkSum time =%.6f\n", final_sum_max);
+        printf("Total serial time=%.6f\n", final_s);
+        printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC, maxC, checksum);
+
+    }
 
     free(A);
     free(B);
