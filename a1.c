@@ -1,4 +1,3 @@
-// a1.c — Assignment 1 Step 1: CLI + allocation + init
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -117,7 +116,27 @@ int main(int argc, char **argv) {
         printf("Total serial time=%.6f\n", final_s);
         printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC, maxC, checksum);
 
+    }else if (mode ==1)
+    {   
+        double start_mode1, end_mode1 = 0.0;
+        start_mode1 = omp_get_wtime();
+        //change the static to sechedule(dynamic, 5) and re-run 
+        #pragma omp parallel for schedule(static)
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double sum = 0.0;
+                for (size_t k = 0; k < N; k++) {
+                    sum += A[idx(i,k,N)] * B[idx(k,j,N)];
+                }
+                C[idx(i,j,N)] = sum;
+            }
+        }
+        end_mode1 = omp_get_wtime();
+        double final = end_mode1-start_mode1;
+        printf("N=%zu mode=%d omp_max_threads=%d\n", N, mode, omp_get_max_threads());
+        printf("Matrix Multiplication and C serial time =%.6f\n", final_m);
     }
+    
 
     free(A);
     free(B);
