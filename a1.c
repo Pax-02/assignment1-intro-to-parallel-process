@@ -194,6 +194,72 @@ int main(int argc, char **argv) {
         }
         printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC, maxC, checksum);
 
+    }else if (mode == 3){
+        double start_mode3, end_mode3 = 0.0;
+        start_mode3 = omp_get_wtime();
+
+        //Matrix multiplication to find c (parallel for collapse(2))
+        #pragma omp parallel for schedule(static) default(none) shared(A, B, C, N)
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double sum = 0.0;
+                for (size_t k = 0; k < N; k++) {
+                    sum += A[idx(i,k,N)] * B[idx(k,j,N)];
+                }
+                C[idx(i,j,N)] = sum;
+            }
+        }
+
+        //3A. parallize the calculation of sum, max ( use reduction) and checksum atomic 
+        double sumC_atomic = 0.0;
+        double maxC_atomic = -INFINITY;
+        long long checksum_atomic = 0;
+
+        //time for atomic
+        double atomic_start = omp_get_wtime();
+        #pragma omp parallel for collapse(2) schedule(static) default(none) shared(C, N, checksum_atomic) reduction(+:sumC_atomic) reduction(max:maxC_atomic)
+                for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double v = C[idx(i,j,N)];
+                sumC_atomic += v;
+                if (v > maxC_atomic) maxC_atomic = v;
+                long long term = ((long long)(v * 1000.0)) % 100000;
+                #pragma omp atomic
+                checksum_atomic += term;
+            }
+        }
+        double atomic_end = omp_get_wtime();
+        double atomic_time = atomic_end - atomic_start;
+
+        //3B Implement the same with critical
+        double sumC_critical = 0.0;
+        double maxC_critical = -INFINITY;
+        long long checksum_critical = 0;
+        //time for critical
+        double critical_start = omp_get_wtime();
+        #pragma omp parallel for collapse(2) schedule(static) default(none) shared(C, N, checksum_critical) reduction(+:sumC_critical) reduction(max:maxC_critical)
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double v = C[idx(i,j,N)];
+                sumC_critical += v;
+                if (v > maxC_critical) maxC_critical = v;
+
+                long long term = ((long long)(v * 1000.0)) % 100000;
+                #pragma omp critical
+                {
+                    checksum_critical += term;
+                }
+            }
+        }
+        double critical_end = omp_get_wtime();
+        double critical_time = critical_end - critical_start;
+
+        printf("N=%zu mode=%d omp_max_threads=%d\n", N, mode, omp_get_max_threads());
+        printf("Atomic loop time 3A =%.6f sumC_atomic=%.6f maxC_atomic=%.6f checksum_atomic=%lld\n",
+            atomic_time, sumC_atomic, maxC_atomic, checksum_atomic);
+        printf("Critical loop time 3B =%.6f sumC_critical=%.6f maxC_critical=%.6f checksum_critical=%lld\n",
+            critical_time, sumC_critical, maxC_critical, checksum_critical);
+
     }
     
     
