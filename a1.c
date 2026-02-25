@@ -68,6 +68,7 @@ int main(int argc, char **argv) {
 
     //start with mode 0 (serial)
     if (mode ==0){
+        int threads_used = 1; //since it's serial
         //start serial time
         start_s = omp_get_wtime();
         //implement the multiplication and adding it to c
@@ -110,7 +111,7 @@ int main(int argc, char **argv) {
         //whole time to run serial
         double final_s=end_s - start_s ;
 
-        printf("N=%zu mode=%d omp_max_threads=%d\n", N, mode, omp_get_max_threads());
+        printf("N=%zu mode=%d serial_thread=%d\n", N, mode, threads_used);
         printf("Matrix Multiplication and C serial time =%.6f\n", final_m);
         printf("SUM, Max, checkSum time =%.6f\n", final_sum_max);
         printf("Total serial time=%.6f\n", final_s);
@@ -319,6 +320,45 @@ int main(int argc, char **argv) {
         printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC_atomic, maxC_atomic, checksum_atomic);
 
     }else if(mode==5){
+        int threads_used = 1;
+        double start_mode5, end_mode5 = 0.0;
+        start_mode5 = omp_get_wtime();
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double sum = 0.0;
+                // SIMD-ize the dot product over k
+                #pragma omp simd reduction(+:sum)
+                for (size_t k = 0; k < N; k++) {
+                    sum += A[idx(i,k,N)] * B[idx(k,j,N)];
+                }
+
+                C[idx(i,j,N)] = sum;
+            }
+        }
+
+        end_mode5= omp_get_wtime();
+        double final_mat_mul_time= end_mode5 - start_mode5;
+
+        //calculate sum,max and checksum for verification
+        double sumC_atomic = 0.0;
+        double maxC_atomic = -INFINITY;
+        long long checksum_atomic = 0;
+
+        #pragma omp parallel for collapse(2) schedule(static) default(none) shared(C, N, checksum_atomic) reduction(+:sumC_atomic) reduction(max:maxC_atomic)
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double v = C[idx(i,j,N)];
+                sumC_atomic += v;
+                if (v > maxC_atomic) maxC_atomic = v;
+                long long term = ((long long)(v * 1000.0)) % 100000;
+                #pragma omp atomic
+                checksum_atomic += term;
+            }
+        }
+
+        printf("N=%zu mode=%d omp_max_threads=%d\n", N, mode, threads_used);
+        printf("Matrix Multiplication C using tasks (mode 5) time =%.6f\n", final_mat_mul_time);
+        printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC_atomic, maxC_atomic, checksum_atomic);
 
     }
     
