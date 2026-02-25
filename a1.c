@@ -120,8 +120,8 @@ int main(int argc, char **argv) {
     {   
         double start_mode1, end_mode1 = 0.0;
         start_mode1 = omp_get_wtime();
-        //change the static to sechedule(dynamic, 5) and re-run 
-        #pragma omp parallel for schedule(static)
+        //change the static to sechedule(dynamic, 5) and re-run & (can't use private  as am using parallel for)
+        #pragma omp parallel for schedule(static) default(none) shared(A,B,C,N)
         for (size_t i = 0; i < N; i++) {
             for (size_t j = 0; j < N; j++) {
                 double sum = 0.0;
@@ -134,7 +134,26 @@ int main(int argc, char **argv) {
         end_mode1 = omp_get_wtime();
         double final = end_mode1-start_mode1;
         printf("N=%zu mode=%d omp_max_threads=%d\n", N, mode, omp_get_max_threads());
-        printf("Matrix Multiplication and C serial time =%.6f\n", final_m);
+        printf("Matrix Multiplication C using (Parallel for schedule) time =%.6f\n", final);
+
+        //calcylate the sum, max and the checksum formula as a way to check correctness of C
+        double sumC = 0.0;
+        double maxC = -INFINITY;
+        long long checksum = 0;
+        double serial_sum_max_check, serial_sum_max_check_end = 0.0;
+        serial_sum_max_check = omp_get_wtime();
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double v = C[idx(i,j,N)];
+                sumC += v;
+                if (v > maxC) maxC = v;
+
+                // cast it from float to integers
+                long long term = ((long long)(v * 1000.0)) % 100000;
+                checksum += term;
+            }
+        }
+        printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC, maxC, checksum);
     }
     
 
