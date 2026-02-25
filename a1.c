@@ -360,10 +360,49 @@ int main(int argc, char **argv) {
         printf("Matrix Multiplication C using tasks (mode 5) time =%.6f\n", final_mat_mul_time);
         printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC_atomic, maxC_atomic, checksum_atomic);
 
+    }else if (mode == 6){
+        double start_mode6, end_mode6 = 0.0;
+        start_mode6 = omp_get_wtime();
+
+        //parallize it using omp parallel for 
+        
+        #pragma omp parallel for schedule(static) default(none) shared(A, B, C, N)
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double sum = 0.0;
+                #pragma omp simd reduction(+:sum)
+                for (size_t k = 0; k < N; k++) {
+                    sum += A[idx(i,k,N)] * B[idx(k,j,N)];
+                }
+                C[idx(i,j,N)] = sum;
+            }
+        }
+        end_mode6 = omp_get_wtime();
+        double final_mat_mul_time= end_mode6 - start_mode6;
+
+        //calculate sum,max and checksum for verification
+        double sumC_atomic = 0.0;
+        double maxC_atomic = -INFINITY;
+        long long checksum_atomic = 0;
+
+        #pragma omp parallel for collapse(2) schedule(static) default(none) shared(C, N, checksum_atomic) reduction(+:sumC_atomic) reduction(max:maxC_atomic)
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double v = C[idx(i,j,N)];
+                sumC_atomic += v;
+                if (v > maxC_atomic) maxC_atomic = v;
+                long long term = ((long long)(v * 1000.0)) % 100000;
+                #pragma omp atomic
+                checksum_atomic += term;
+            }
+        }
+
+        printf("N=%zu mode=%d omp_max_threads=%d\n", N, mode, omp_get_max_threads());
+        printf("Matrix Multiplication C using tasks (mode 6) time =%.6f\n", final_mat_mul_time);
+        printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC_atomic, maxC_atomic, checksum_atomic);
+
     }
-    
-    
-    
+      
 
     free(A);
     free(B);
