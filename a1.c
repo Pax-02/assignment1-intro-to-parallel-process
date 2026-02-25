@@ -153,6 +153,7 @@ int main(int argc, char **argv) {
                 checksum += term;
             }
         }
+
         printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC, maxC, checksum);
     }else if (mode == 2)
     {
@@ -261,6 +262,66 @@ int main(int argc, char **argv) {
             critical_time, sumC_critical, maxC_critical, checksum_critical);
 
     }
+    else if (mode == 4)
+    { 
+        //tasks per row block (these can be modified to 32,...) 
+        const size_t block_rows = 16;
+        double task_mat_mul_start = omp_get_wtime();
+        #pragma omp parallel default(none) shared(A, B, C, N, block_rows)
+        {
+            #pragma omp single
+            {
+                #pragma omp taskgroup
+                {
+                    for (size_t i_start = 0; i_start < N; i_start += block_rows){
+                        size_t i_end = i_start + block_rows;
+                        //not overpass N
+                        if (i_end > N) i_end = N;
+                        //give each task it's chunk or block
+                        #pragma omp task firstprivate(i_start, i_end) shared(A, B, C, N)
+                        {
+                            for (size_t i = i_start; i < i_end; i++){
+                                for (size_t j = 0; j < N; j++){
+                                    double sum = 0.0;
+                                    for (size_t k = 0; k < N; k++){
+                                        sum += A[idx(i,k,N)] * B[idx(k,j,N)];
+                                    }
+                                    C[idx(i,j,N)] = sum;
+                                }
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+        double task_mat_mul_end = omp_get_wtime();
+        double task_mat_mul_final = task_mat_mul_end - task_mat_mul_start; 
+
+        //Check if the value of c is right calculating sum, max, checksum
+        double sumC_atomic = 0.0;
+        double maxC_atomic = -INFINITY;
+        long long checksum_atomic = 0;
+
+        #pragma omp parallel for collapse(2) schedule(static) default(none) shared(C, N, checksum_atomic) reduction(+:sumC_atomic) reduction(max:maxC_atomic)
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double v = C[idx(i,j,N)];
+                sumC_atomic += v;
+                if (v > maxC_atomic) maxC_atomic = v;
+                long long term = ((long long)(v * 1000.0)) % 100000;
+                #pragma omp atomic
+                checksum_atomic += term;
+            }
+        }
+        printf("N=%zu mode=%d omp_max_threads=%d\n", N, mode, omp_get_max_threads());
+        printf("Matrix Multiplication C using tasks (mode 4) time =%.6f\n", task_mat_mul_final);
+        printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC_atomic, maxC_atomic, checksum_atomic);
+
+    }else if(mode==5){
+
+    }
+    
     
     
 
