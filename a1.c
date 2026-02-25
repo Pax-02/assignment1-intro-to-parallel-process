@@ -154,7 +154,48 @@ int main(int argc, char **argv) {
             }
         }
         printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC, maxC, checksum);
+    }else if (mode == 2)
+    {
+        double start_mode2, end_mode2 = 0.0;
+        start_mode2 = omp_get_wtime();
+        //using collapse 2 for matrix multiplication
+        //For experiment you may still change static to dynamic
+        #pragma omp parallel for collapse(2) schedule(static) default(none) shared(A, B, C, N)
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double sum = 0.0;  
+                for (size_t k = 0; k < N; k++) {
+                    sum += A[idx(i,k,N)] * B[idx(k,j,N)];
+                }
+                C[idx(i,j,N)] = sum;
+            }
+        }
+
+        end_mode2 = omp_get_wtime();
+        double final_mode2 = end_mode2 - start_mode2;
+        printf("N=%zu mode=%d omp_max_threads=%d\n", N, mode, omp_get_max_threads());
+        printf("Matrix Multiplication C using (Parallel for collapse schedule) time =%.6f\n", final_mode2);
+        //calcylate the sum, max and the checksum formula as a way to check correctness of C
+        double sumC = 0.0;
+        double maxC = -INFINITY;
+        long long checksum = 0;
+        double serial_sum_max_check, serial_sum_max_check_end = 0.0;
+        serial_sum_max_check = omp_get_wtime();
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                double v = C[idx(i,j,N)];
+                sumC += v;
+                if (v > maxC) maxC = v;
+
+                // cast it from float to integers
+                long long term = ((long long)(v * 1000.0)) % 100000;
+                checksum += term;
+            }
+        }
+        printf("sumC=%.6f maxC=%.6f checksum=%lld\n", sumC, maxC, checksum);
+
     }
+    
     
 
     free(A);
