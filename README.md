@@ -41,3 +41,7 @@ I Ishimwe Pacis Hanyurwimfura confirm that :
 - All code in this repository was written and understood by me
 - I implemented each mode (0–6) incrementally, and used git commits to track my progress
 - Any external resources I consulted were for general OpenMP and C language reference, and no code was directly copied from other students or online solutions.
+
+## LINK to Github
+
+https://github.com/Pax-02/assignment1-intro-to-parallel-process.git
